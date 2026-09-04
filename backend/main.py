@@ -3,8 +3,9 @@ from datetime import datetime
 from fastapi import FastAPI
 from database.mongodb import db
 from models.product import Product
-from billing.bill import BillRequest
-
+from models.bill import BillRequest
+from routes.billing_route import router as billing_router
+from models.customer import Customer
 
 app = FastAPI(
     title="Retail POS System",
@@ -12,6 +13,7 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.include_router(billing_router)
 
 # =========================
 # HOME
@@ -53,7 +55,7 @@ def database_test():
 # ADD PRODUCT
 # =========================
 
-@app.post("/products")
+@app.post("/add-product")
 def add_product(product: Product):
     product_data = product.model_dump()
 
@@ -218,3 +220,76 @@ def get_bills():
             bill["created_at"] = bill["created_at"].isoformat()
 
     return bills
+
+
+# =========================
+# UPDATE PRODUCT
+# =========================
+
+@app.put("/products/{name}")
+def update_product(name: str, product: Product):
+    result = db["products"].update_one(
+        {"name": {"$regex": f"^{name}$", "$options": "i"}},
+        {"$set": product.model_dump()}
+    )
+    if result.matched_count == 0:
+        return {"error": f"Product '{name}' not found"}
+    return {"message": f"Product '{name}' updated successfully"}
+
+
+# =========================
+# DELETE PRODUCT
+# =========================
+
+@app.delete("/products/{name}")
+def delete_product(name: str):
+    result = db["products"].delete_one({"name": {"$regex": f"^{name}$", "$options": "i"}})
+    if result.deleted_count == 0:
+        return {"error": f"Product '{name}' not found"}
+    return {"message": f"Product '{name}' deleted successfully"}
+
+
+# =========================
+# ADD CUSTOMER
+# =========================
+
+@app.post("/add-customers")
+def add_customer(customer: Customer):
+    result = db["customers"].insert_one(customer.model_dump())
+    return {"message": "Customer added successfully", "customer_id": str(result.inserted_id)}
+
+
+# =========================
+# GET ALL CUSTOMERS
+# =========================
+
+@app.get("/customers")
+def get_customers():
+    customers = list(db["customers"].find())
+    for c in customers:
+        c["_id"] = str(c["_id"])
+    return customers
+
+
+# =========================
+# UPDATE CUSTOMER
+# =========================
+
+@app.put("/customers/{name}")
+def update_customer(name: str, customer: Customer):
+    result = db["customers"].update_one({"name": {"$regex": f"^{name}$", "$options": "i"}}, {"$set": customer.model_dump()})
+    if result.matched_count == 0:
+        return {"error": "Customer not found"}
+    return {"message": "Customer updated successfully"}
+
+
+# =========================
+# DELETE CUSTOMER
+# =========================
+
+@app.delete("/customers/{name}")
+def delete_customer(name: str):
+    result = db["customers"].delete_one({"name": {"$regex": f"^{name}$", "$options": "i"}})
+    if result.deleted_count == 0:
+        return {"error": "Customer not found"}
+    return {"message": "Customer deleted successfully"}
