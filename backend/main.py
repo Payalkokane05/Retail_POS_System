@@ -6,11 +6,19 @@ from models.product import Product
 from models.bill import BillRequest
 from routes.billing_route import router as billing_router
 from models.customer import Customer
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Retail POS System",
     description="Conversational AI Framework for Intelligent Retail POS",
     version="1.0.0"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # for development only
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(billing_router)
@@ -185,12 +193,13 @@ def create_bill(bill: BillRequest):
     grand_total = subtotal + total_tax
 
     bill_data = {
-        "items": bill_items,
-        "subtotal": subtotal,
-        "tax": total_tax,
-        "grand_total": grand_total,
-        "created_at": datetime.now()
-    }
+    "customer": bill.customer,
+    "items": bill_items,
+    "subtotal": subtotal,
+    "tax": total_tax,
+    "grand_total": grand_total,
+    "created_at": datetime.now()
+}
 
     result = db["bills"].insert_one(bill_data)
 

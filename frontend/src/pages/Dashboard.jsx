@@ -11,6 +11,22 @@ const PRODUCT_LIST = [
   { name: "Chana", price: 90, unit: "kg" },
 ];
 
+const API_BASE = "http://127.0.0.1:8000";
+
+const extractCustomerName = (text) => {
+  const match = text.match(/^(.*?)(\d)/);
+  return match ? match[1].trim() : "";
+};
+
+const callBillingChat = async (message) => {
+  const response = await fetch(`${API_BASE}/billing/agent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message }),
+  });
+  return response.json();
+};
+
 const UNIT_PATTERN =
   "kg|kgs|kilo|kilos|kilogram|kilograms|g|gram|grams|packet|packets|pkt|litre|litres|liter|liters|l";
 
@@ -116,7 +132,7 @@ const formatQuantity = (quantity) => {
 };
 
 /* =========================================================
-   PARSE PRODUCTS
+   PARSE PRODUCTS (still used by local edit/add/remove commands)
 ========================================================= */
 
 const parseProducts = (text) => {
@@ -165,79 +181,6 @@ const parseProducts = (text) => {
   }
 
   return products;
-};
-
-/* =========================================================
-   CUSTOMER + PRODUCTS
-========================================================= */
-
-const getCustomerAndProducts = (text) => {
-  const normalized = normalizeText(text);
-
-  if (!normalized) {
-    return {
-      customer: "",
-      items: [],
-    };
-  }
-
-  const items = parseProducts(normalized);
-
-  if (items.length === 0) {
-    return {
-      customer: "",
-      items: [],
-    };
-  }
-
-  let firstProductIndex = -1;
-
-  PRODUCT_LIST.forEach((product) => {
-    const regex = new RegExp(
-      `\\b${escapeRegExp(product.name)}\\b`,
-      "i"
-    );
-
-    const match = normalized.match(regex);
-
-    if (
-      match &&
-      (firstProductIndex === -1 ||
-        match.index < firstProductIndex)
-    ) {
-      firstProductIndex = match.index;
-    }
-  });
-
-  if (firstProductIndex === -1) {
-    return {
-      customer: "",
-      items: [],
-    };
-  }
-
-  let customerPart = normalized
-    .substring(0, firstProductIndex)
-    .trim();
-
-  customerPart = customerPart
-    .replace(
-      new RegExp(
-        `\\s+\\d+(?:\\.\\d+)?\\s*(?:${UNIT_PATTERN})?\\s*$`,
-        "i"
-      ),
-      ""
-    )
-    .trim();
-
-  customerPart = customerPart
-    .replace(/\s+\d+(?:\.\d+)?\s*$/i, "")
-    .trim();
-
-  return {
-    customer: customerPart,
-    items,
-  };
 };
 
 /* =========================================================
@@ -497,8 +440,8 @@ function Dashboard() {
                 language === "mr"
                   ? "Shree Ganesh Grocery Retail POS मध्ये आपले स्वागत आहे! 👋 ग्राहकाचे नाव आणि वस्तूंची माहिती खाली टाका आणि बिल लगेच तयार करा."
                   : language === "hi"
-                  ? "Shree Ganesh Grocery Retail POS में आपका स्वागत है! 👋 ग्राहक का नाम और वस्तुओं की जानकारी नीचे दर्ज करें और बिल तुरंत बनाएं।"
-                  : "Welcome to Shree Ganesh Grocery Retail POS! 👋 Enter customer details and items below to create a bill instantly.",
+                    ? "Shree Ganesh Grocery Retail POS में आपका स्वागत है! 👋 ग्राहक का नाम और वस्तुओं की जानकारी नीचे दर्ज करें और बिल तुरंत बनाएं।"
+                    : "Welcome to Shree Ganesh Grocery Retail POS! 👋 Enter customer details and items below to create a bill instantly.",
             },
           ]);
         }
@@ -620,11 +563,11 @@ function Dashboard() {
   const saveBillsToStorage = (updatedBills) => {
     const validBills = Array.isArray(updatedBills)
       ? updatedBills.filter(
-          (bill) =>
-            bill &&
-            bill.customer &&
-            Array.isArray(bill.items)
-        )
+        (bill) =>
+          bill &&
+          bill.customer &&
+          Array.isArray(bill.items)
+      )
       : [];
 
     localStorage.setItem(
@@ -709,9 +652,9 @@ function Dashboard() {
       return prev.map((message, i) =>
         i === index
           ? {
-              ...message,
-              bill: updatedBill,
-            }
+            ...message,
+            bill: updatedBill,
+          }
           : message
       );
     });
@@ -783,8 +726,8 @@ function Dashboard() {
         language === "mr"
           ? "कृपया ग्राहकाचे नाव द्या."
           : language === "hi"
-          ? "कृपया ग्राहक का नाम दें।"
-          : "Please enter customer name."
+            ? "कृपया ग्राहक का नाम दें।"
+            : "Please enter customer name."
       );
       return;
     }
@@ -794,8 +737,8 @@ function Dashboard() {
         language === "mr"
           ? "कृपया item आणि quantity द्या."
           : language === "hi"
-          ? "कृपया item और quantity दें।"
-          : "Please enter item and quantity."
+            ? "कृपया item और quantity दें।"
+            : "Please enter item and quantity."
       );
       return;
     }
@@ -923,7 +866,7 @@ function Dashboard() {
     let quantityText = command
       .substring(
         productMatch.index +
-          productMatch[0].length
+        productMatch[0].length
       )
       .trim();
 
@@ -955,7 +898,7 @@ function Dashboard() {
 
     let unit = normalizeUnit(
       quantityMatch[2] ||
-        product.unit
+      product.unit
     );
 
     if (
@@ -1156,9 +1099,13 @@ function Dashboard() {
 
   /* =========================================================
      PROCESS MESSAGE
+     Now routed through the real AI backend.
+     - If the AI calculated a bill -> build a bill card (same as before).
+     - If the AI ran any other tool (add_product, delete_customer, etc.)
+       or just replied normally -> show the AI's reply text.
   ========================================================= */
 
-  const processMessage = (text) => {
+  const processMessage = async (text) => {
     if (handleEditCommand(text)) {
       return;
     }
@@ -1171,22 +1118,59 @@ function Dashboard() {
       return;
     }
 
-    const {
-      customer,
-      items,
-    } = getCustomerAndProducts(text);
+    let data;
+    try {
+      data = await callBillingChat(text);
+    } catch (error) {
+      console.error("Billing chat error:", error);
+      addAiMessage(
+        "Sorry, I couldn't reach the server. Please make sure the backend is running."
+      );
+      return;
+    }
 
-    createOrUpdateBill(
-      customer,
-      items
-    );
+    const results = data.results || {};
+
+    // Case 1: AI calculated a bill
+    if (results.calculate_bill) {
+      const aiBill = results.calculate_bill;
+      const customer = extractCustomerName(text);
+
+      const notFound = (aiBill.items || []).filter((i) => i.error);
+      if (notFound.length > 0) {
+        addAiMessage(
+          `Product(s) not found: ${notFound
+            .map((i) => i.name)
+            .join(", ")}`
+        );
+      }
+
+      const validItems = (aiBill.items || [])
+        .filter((i) => !i.error)
+        .map((i) => ({
+          id: createId(),
+          name: i.name,
+          price: i.unit_price,
+          quantity: i.quantity,
+          unit: "",
+          total: i.total,
+        }));
+
+      if (validItems.length > 0) {
+        createOrUpdateBill(customer, validItems);
+      }
+      return;
+    }
+
+    // Case 2: AI ran a different tool (product/customer CRUD), or no tool at all
+    addAiMessage(data.reply || "Done.");
   };
 
   /* =========================================================
      SEND TEXT
   ========================================================= */
 
-  const handleSendText = (text) => {
+  const handleSendText = async (text) => {
     const cleanText =
       String(text || "").trim();
 
@@ -1203,7 +1187,7 @@ function Dashboard() {
 
     setInput("");
 
-    processMessage(cleanText);
+    await processMessage(cleanText);
   };
 
   const handleSend = () => {
@@ -1247,8 +1231,8 @@ function Dashboard() {
       language === "mr"
         ? "mr-IN"
         : language === "hi"
-        ? "hi-IN"
-        : "en-IN";
+          ? "hi-IN"
+          : "en-IN";
 
     recognition.onstart = () => {
       setListening(true);
@@ -1383,7 +1367,7 @@ function Dashboard() {
      SAVE BUTTON
   ========================================================= */
 
-  const saveBill = (bill) => {
+  const saveBill = async (bill) => {
     let updatedItems;
 
     if (editingBillId === bill.id) {
@@ -1432,16 +1416,31 @@ function Dashboard() {
       savedAt:
         new Date().toISOString(),
     };
-
+    try {
+      await fetch(`${API_BASE}/billing/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customer: savedBill.customer,
+          items: updatedItems.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+          })),
+        }),
+      });
+    } catch (error) {
+      console.error("Failed to save bill to database:", error);
+      addAiMessage("Warning: bill saved locally but failed to save to the database.");
+    }
     const existingIndex =
       bills.findIndex(
         (item) =>
           item.id ===
-            savedBill.id ||
+          savedBill.id ||
           item.customer
             .toLowerCase() ===
-            savedBill.customer
-              .toLowerCase()
+          savedBill.customer
+            .toLowerCase()
       );
 
     let updatedBills;
@@ -1553,8 +1552,8 @@ function Dashboard() {
         language === "mr"
           ? "पूर्ण chat आणि सर्व bills clear करायचे आहेत का?"
           : language === "hi"
-          ? "क्या आप पूरी chat और सभी bills clear करना चाहते हैं?"
-          : "Do you want to clear the entire chat and all bills?"
+            ? "क्या आप पूरी chat और सभी bills clear करना चाहते हैं?"
+            : "Do you want to clear the entire chat and all bills?"
       );
 
     if (!confirmed) return;
@@ -1588,8 +1587,8 @@ function Dashboard() {
           language === "mr"
             ? "Chat आणि सर्व bills clear झाले."
             : language === "hi"
-            ? "Chat और सभी bills clear हो गए।"
-            : "Chat and all bills have been cleared.",
+              ? "Chat और सभी bills clear हो गए।"
+              : "Chat and all bills have been cleared.",
       },
     ]);
   };
@@ -1615,8 +1614,8 @@ function Dashboard() {
 
     const items = isEditing
       ? Object.values(
-          editingItems
-        )
+        editingItems
+      )
       : bill.items || [];
 
     const total =
@@ -2195,9 +2194,9 @@ function Dashboard() {
 
               const isWelcome =
                 message.type ===
-                  "ai" &&
+                "ai" &&
                 messages.length ===
-                  1;
+                1;
 
               return (
                 <div
@@ -2210,7 +2209,7 @@ function Dashboard() {
                       "flex",
                     justifyContent:
                       message.type ===
-                      "user"
+                        "user"
                         ? "flex-end"
                         : "flex-start",
                     marginBottom:
@@ -2231,12 +2230,12 @@ function Dashboard() {
                         "16px",
                       background:
                         message.type ===
-                        "user"
+                          "user"
                           ? "#2563eb"
                           : "#ffffff",
                       color:
                         message.type ===
-                        "user"
+                          "user"
                           ? "#ffffff"
                           : "#111827",
                       boxShadow:
@@ -2266,12 +2265,12 @@ function Dashboard() {
                           }}
                         >
                           {language ===
-                          "mr"
+                            "mr"
                             ? "Shree Ganesh Grocery Retail POS मध्ये आपले स्वागत आहे! 👋"
                             : language ===
                               "hi"
-                            ? "Shree Ganesh Grocery Retail POS में आपका स्वागत है! 👋"
-                            : "Welcome to Shree Ganesh Grocery Retail POS! 👋"}
+                              ? "Shree Ganesh Grocery Retail POS में आपका स्वागत है! 👋"
+                              : "Welcome to Shree Ganesh Grocery Retail POS! 👋"}
                         </div>
 
                         <div
@@ -2287,12 +2286,12 @@ function Dashboard() {
                           }}
                         >
                           {language ===
-                          "mr"
+                            "mr"
                             ? "ग्राहकाचे नाव आणि वस्तूंची माहिती खाली टाका आणि बिल लगेच तयार करा."
                             : language ===
                               "hi"
-                            ? "ग्राहक का नाम और वस्तुओं की जानकारी नीचे दर्ज करें और बिल तुरंत बनाएं।"
-                            : "Enter customer details and items below to create a bill instantly."}
+                              ? "ग्राहक का नाम और वस्तुओं की जानकारी नीचे दर्ज करें और बिल तुरंत बनाएं।"
+                              : "Enter customer details and items below to create a bill instantly."}
                         </div>
 
                         <div
@@ -2308,12 +2307,12 @@ function Dashboard() {
                           }}
                         >
                           {language ===
-                          "mr"
+                            "mr"
                             ? "उदा. Name Item Quantity"
                             : language ===
                               "hi"
-                            ? "जैसे Name Item Quantity"
-                            : "Example: Name Item Quantity"}
+                              ? "जैसे Name Item Quantity"
+                              : "Example: Name Item Quantity"}
                         </div>
                       </>
                     ) : (
@@ -2392,12 +2391,12 @@ function Dashboard() {
             }}
             placeholder={
               language ===
-              "mr"
+                "mr"
                 ? "उदा. Rahul 2 kg Rice"
                 : language ===
                   "hi"
-                ? "जैसे Rahul 2 kg Rice"
-                : "Example: Rahul 2 kg Rice"
+                  ? "जैसे Rahul 2 kg Rice"
+                  : "Example: Rahul 2 kg Rice"
             }
             style={{
               flex: 1,

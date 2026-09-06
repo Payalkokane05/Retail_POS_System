@@ -13,7 +13,7 @@ import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
 import Products from "./pages/Products";
 import Customers from "./pages/Customers";
-
+import Bills from "./pages/Billis";
 import Sidebar from "./components/Sidebar";
 
 function MainLayout() {
@@ -51,7 +51,7 @@ function MainLayout() {
               />
             }
           />
-
+          <Route path="/bills" element={<Bills />} />
         </Routes>
       </main>
 

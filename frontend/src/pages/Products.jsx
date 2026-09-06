@@ -1,44 +1,24 @@
 import React, { useEffect, useState } from "react";
 
 function Products() {
-  const [products, setProducts] = useState(() => {
-    const savedProducts = localStorage.getItem("products");
+  const API_BASE = "http://127.0.0.1:8000";
 
-    if (savedProducts) {
-      try {
-        return JSON.parse(savedProducts);
-      } catch (error) {
-        console.error("Products loading error:", error);
-      }
+  const [products, setProducts] = useState([]);
+
+  const loadProducts = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/products`);
+      const data = await response.json();
+      setProducts(data.map((p) => ({ ...p, id: p._id })));
+    } catch (error) {
+      console.error("Failed to load products:", error);
+      setProducts([]);
     }
+  };
 
-    return [
-      {
-        id: 1,
-        name: "Rice",
-        price: 65,
-        unit: "kg",
-      },
-      {
-        id: 2,
-        name: "Sugar",
-        price: 50,
-        unit: "kg",
-      },
-      {
-        id: 3,
-        name: "Salt",
-        price: 30,
-        unit: "packet",
-      },
-      {
-        id: 4,
-        name: "Wheat",
-        price: 55,
-        unit: "kg",
-      },
-    ];
-  });
+  useEffect(() => {
+    loadProducts();
+  }, []);
 
   const [showForm, setShowForm] = useState(false);
 
@@ -48,60 +28,47 @@ function Products() {
     unit: "piece",
   });
 
-  // ==========================================
-  // SAVE PRODUCTS TO LOCAL STORAGE
-  // ==========================================
-  useEffect(() => {
-    localStorage.setItem(
-      "products",
-      JSON.stringify(products)
-    );
-  }, [products]);
 
   // ==========================================
   // ADD PRODUCT
   // ==========================================
-  const addProduct = () => {
-    if (
-      !newProduct.name.trim() ||
-      !newProduct.price
-    ) {
-      alert(
-        "Please enter product name and price."
-      );
+  const addProduct = async () => {
+    if (!newProduct.name.trim() || !newProduct.price) {
+      alert("Please enter product name and price.");
       return;
     }
 
-    const product = {
-      id: Date.now(),
-      name: newProduct.name.trim(),
-      price: Number(newProduct.price),
-      unit: newProduct.unit,
-    };
+    try {
+      await fetch(`${API_BASE}/add-product`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newProduct.name.trim(),
+          price: Number(newProduct.price),
+          unit: newProduct.unit,
+          tax: 0,
+        }),
+      });
 
-    setProducts((prev) => [
-      ...prev,
-      product,
-    ]);
+      await loadProducts();
 
-    setNewProduct({
-      name: "",
-      price: "",
-      unit: "piece",
-    });
-
-    setShowForm(false);
+      setNewProduct({ name: "", price: "", unit: "piece" });
+      setShowForm(false);
+    } catch (error) {
+      console.error("Failed to add product:", error);
+      alert("Failed to add product.");
+    }
   };
-
   // ==========================================
   // REMOVE PRODUCT
   // ==========================================
-  const removeProduct = (id) => {
-    setProducts((prev) =>
-      prev.filter(
-        (product) => product.id !== id
-      )
-    );
+  const removeProduct = async (name) => {
+    try {
+      await fetch(`${API_BASE}/products/${name}`, { method: "DELETE" });
+      await loadProducts();
+    } catch (error) {
+      console.error("Failed to remove product:", error);
+    }
   };
 
   return (
@@ -311,9 +278,8 @@ function Products() {
                 </button>
 
                 <button
-                  onClick={() =>
-                    removeProduct(product.id)
-                  }
+                  onClick={() => removeProduct(product.name)}
+
                   className="rounded-xl border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
                 >
                   Remove
@@ -331,26 +297,28 @@ function Products() {
 
       {/* EMPTY */}
 
-      {products.length === 0 && (
+      {
+        products.length === 0 && (
 
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
 
-          <div className="text-5xl">
-            🛒
+            <div className="text-5xl">
+              🛒
+            </div>
+
+            <h2 className="mt-4 text-lg font-bold text-slate-900">
+              No Products Added
+            </h2>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Click "Add Product" to add your first product.
+            </p>
+
           </div>
+        )
+      }
 
-          <h2 className="mt-4 text-lg font-bold text-slate-900">
-            No Products Added
-          </h2>
-
-          <p className="mt-1 text-sm text-slate-500">
-            Click "Add Product" to add your first product.
-          </p>
-
-        </div>
-      )}
-
-    </div>
+    </div >
   );
 }
 

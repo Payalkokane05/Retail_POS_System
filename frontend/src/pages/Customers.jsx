@@ -76,51 +76,32 @@ function Customers() {
   // LOAD CUSTOMERS
   // =========================
 
-  const loadCustomers = () => {
+  const API_BASE = "http://127.0.0.1:8000";
+
+  const loadCustomers = async () => {
     try {
-      const saved =
-        localStorage.getItem("posCustomers");
+      const response = await fetch(`${API_BASE}/customers`);
+      const data = await response.json();
 
-      if (!saved) {
-        setCustomers([]);
-        return;
-      }
+      const formatted = data.map((c) => ({
+        id: c._id,
+        name: c.name,
+        phone: c.phone,
+        bills: 0,
+        purchases: 0,
+        totalSpent: 0,
+        history: [],
+      }));
 
-      const parsed = JSON.parse(saved);
-
-      if (Array.isArray(parsed)) {
-        setCustomers(parsed);
-      } else {
-        setCustomers([]);
-      }
+      setCustomers(formatted);
     } catch (error) {
-      console.error(
-        "Customer data loading error:",
-        error
-      );
-
+      console.error("Failed to load customers:", error);
       setCustomers([]);
     }
   };
 
   useEffect(() => {
     loadCustomers();
-
-    const handleStorage = () => {
-      loadCustomers();
-    };
-
-    window.addEventListener(
-      "storage",
-      handleStorage
-    );
-
-    return () => {
-      window.removeEventListener(
-        "storage",
-        handleStorage
-      );
-    };
   }, []);
 
   // =========================
@@ -167,8 +148,8 @@ function Customers() {
       language === "mr"
         ? "mr-IN"
         : language === "hi"
-        ? "hi-IN"
-        : "en-IN",
+          ? "hi-IN"
+          : "en-IN",
       {
         day: "2-digit",
         month: "short",
@@ -594,7 +575,7 @@ function Customers() {
               </h3>
 
               {!selectedCustomer.history ||
-              selectedCustomer.history.length === 0 ? (
+                selectedCustomer.history.length === 0 ? (
 
                 <div className="
                   rounded-xl

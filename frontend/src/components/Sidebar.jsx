@@ -93,6 +93,18 @@ function Sidebar() {
         </svg>
       ),
     },
+    {
+      path: "/bills",
+      label: "Bills",
+      icon: (
+        <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path d="M6 2h9l5 5v15H6z" />
+          <path d="M15 2v5h5" />
+          <path d="M9 13h6M9 17h6" />
+        </svg>
+      ),
+    },
+
   ];
 
   return (
@@ -190,10 +202,9 @@ function Sidebar() {
                 font-semibold
                 transition-all
 
-                ${
-                  isActive
-                    ? "bg-blue-600 text-white shadow-lg shadow-blue-900/30"
-                    : "text-slate-300 hover:bg-slate-900 hover:text-white"
+                ${isActive
+                  ? "bg-blue-600 text-white shadow-lg shadow-blue-900/30"
+                  : "text-slate-300 hover:bg-slate-900 hover:text-white"
                 }
                 `
               }

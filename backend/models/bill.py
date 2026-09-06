@@ -1,13 +1,12 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class BillItem(BaseModel):
     name: str
     quantity: float
-    mobile_number: Optional[str] = None
-    customer_name: Optional[str] = None
 
 
 class BillRequest(BaseModel):
+    customer: Optional[str] = None
     items: List[BillItem]
