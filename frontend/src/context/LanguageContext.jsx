@@ -1,15 +1,34 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import i18n, { supportedLanguages } from "../i18n";
 
 const LanguageContext = createContext(null);
 
+const getSupportedLanguage = (value) =>
+  supportedLanguages.some(({ code }) => code === value) ? value : "en";
+
+const localeTags = {
+  en: "en-IN",
+  hi: "hi-IN",
+  mr: "mr-IN",
+  ta: "ta-IN",
+  bn: "bn-IN",
+  te: "te-IN",
+};
+
 export function LanguageProvider({ children }) {
-  const [language, setLanguageState] = useState(
-    localStorage.getItem("posLanguage") || ""
+  const [language, setLanguageState] = useState(() =>
+    getSupportedLanguage(localStorage.getItem("posLanguage"))
   );
 
-  const setLanguage = (lang) => {
-    localStorage.setItem("posLanguage", lang);
-    setLanguageState(lang);
+  useEffect(() => {
+    document.documentElement.lang = localeTags[language];
+    i18n.changeLanguage(language);
+  }, [language]);
+
+  const setLanguage = (value) => {
+    const nextLanguage = getSupportedLanguage(value);
+    localStorage.setItem("posLanguage", nextLanguage);
+    setLanguageState(nextLanguage);
   };
 
   return (

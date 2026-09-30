@@ -8,3 +8,10 @@ langchain-core
 langchain-openai
 langchain-google-genai
 langchain-openrouter
+langgraph
+langgraph-checkpoint-mongodb
+bcrypt
+pyjwt
+Pillow
+python-multipart
+twilio
